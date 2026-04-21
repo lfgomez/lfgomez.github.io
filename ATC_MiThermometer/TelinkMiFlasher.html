@@ -1005,51 +1005,45 @@ function getMiClock() {
 	});
 }
 //var micharacteristics;
-function miAction() {
+async function miAction() {
 	writeCharacteristicSpeed = null;
-	gattServer.getPrimaryService('ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6')
-		.then(service => {
-			addClog("Found MiMain service");
-			ServiceMain = service;
-			addClog("Check micharacteristics:");
-			return ServiceMain.getCharacteristics();
-		}).then(characteristics => {
-			//micharacteristics = characteristics;
-			for (let i = 0; i < characteristics.length; i++) {
-				addClog(characteristics[i].uuid);
-				if (characteristics[i].uuid == "ebe0ccd8-7a0a-4b0c-8a1a-6ff2997da3a6") {
-					ServiceMain.getCharacteristic(characteristics[i].uuid).then (characteristic =>
-					{ addClog("Found MiSet characteristic Speed");
-					 writeCharacteristicSpeed = characteristic; });
-				}
-				else if (characteristics[i].uuid == "ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6") {
-					ServiceMain.getCharacteristic(characteristics[i].uuid).then ( characteristic =>
-					{ addClog('Found MiTemp characteristic');
-						nitifiyCharTemp = characteristic;
-						return nitifiyCharTemp.startNotifications().then(() => {
-							nitifiyCharTemp.addEventListener('characteristicvaluechanged', event => {
-							let value = event.target.value;
-							let temp = value.getInt16(0, true) / 100;
-							let hum = value.getUint8(2);
-							let vbat = value.getUint16(3,true);
-							let tempTempString = "Temp: " + temp + "°C, Humi: " + hum + "%, Bat: "+vbat+" mV";
-							$("tempHumiData").innerHTML = '<hr>'+tempTempString;
-							addClog(tempTempString); });
-						});
-					});
-				}
-				else if (characteristics[i].uuid == "ebe0ccb7-7a0a-4b0c-8a1a-6ff2997da3a6") {
-					ServiceMain.getCharacteristic(characteristics[i].uuid).then ( characteristic =>
-					{ addClog('Found MiClock characteristic');
-						clockCharacteristic = characteristic;
-						return clockCharacteristic.readValue().then(value => {
-							showMiClock(value);
-						});
-					});
-				}
+	try {
+		const service = await gattServer.getPrimaryService('ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6');
+		addClog("Found MiMain service");
+		ServiceMain = service;
+		addClog("Check micharacteristics:");
+		const characteristics = await ServiceMain.getCharacteristics();
+		for (let i = 0; i < characteristics.length; i++) {
+			addClog(characteristics[i].uuid);
+			if (characteristics[i].uuid == "ebe0ccd8-7a0a-4b0c-8a1a-6ff2997da3a6") {
+				writeCharacteristicSpeed = await ServiceMain.getCharacteristic(characteristics[i].uuid);
+				addClog("Found MiSet characteristic Speed");
 			}
-			miAuthorization()
-		}).catch(handleError);
+			else if (characteristics[i].uuid == "ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6") {
+				nitifiyCharTemp = await ServiceMain.getCharacteristic(characteristics[i].uuid);
+				addClog('Found MiTemp characteristic');
+				await nitifiyCharTemp.startNotifications();
+				nitifiyCharTemp.addEventListener('characteristicvaluechanged', event => {
+					let value = event.target.value;
+					let temp = value.getInt16(0, true) / 100;
+					let hum = value.getUint8(2);
+					let vbat = value.getUint16(3,true);
+					let tempTempString = "Temp: " + temp + "°C, Humi: " + hum + "%, Bat: "+vbat+" mV";
+					$("tempHumiData").innerHTML = '<hr>'+tempTempString;
+					addClog(tempTempString);
+				});
+			}
+			else if (characteristics[i].uuid == "ebe0ccb7-7a0a-4b0c-8a1a-6ff2997da3a6") {
+				clockCharacteristic = await ServiceMain.getCharacteristic(characteristics[i].uuid);
+				addClog('Found MiClock characteristic');
+				const value = await clockCharacteristic.readValue();
+				showMiClock(value);
+			}
+		}
+		miAuthorization();
+	} catch (err) {
+		handleError(err);
+	}
 }
 var buf11;
 var cnt_buf11 = 0;
